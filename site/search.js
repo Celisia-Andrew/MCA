@@ -1,5 +1,5 @@
-// School search helpers: plain functions with no DOM access, so they can be
-// unit-tested with Node (tests/test_search.mjs) as well as used by app.js.
+// School search and display-filter helpers: plain functions with no DOM access,
+// so they can be unit-tested with Node (tests/test_search.mjs) as well as used by app.js.
 (function (root) {
   "use strict";
 
@@ -26,7 +26,25 @@
     return sorted.filter((s) => s.school.toLowerCase().includes(q) || s.district.toLowerCase().includes(q));
   }
 
-  const api = { normalize, compareSchools, sortSchools, filterSchools };
+  // "Small" = fewer than minTested students with a valid score. `tested` is the
+  // denominator of the plotted rate (pct = met / tested).
+  function isSmallSchool(s, minTested) {
+    return s.tested < minTested;
+  }
+
+  function countSmallSchools(schools, minTested) {
+    let count = 0;
+    let ge90 = 0;
+    for (const s of schools) {
+      if (isSmallSchool(s, minTested)) {
+        count += 1;
+        if (s.frpGe90) ge90 += 1;
+      }
+    }
+    return { count, ge90 };
+  }
+
+  const api = { normalize, compareSchools, sortSchools, filterSchools, isSmallSchool, countSmallSchools };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.MCASearch = api;
 })(this);

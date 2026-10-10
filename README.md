@@ -85,6 +85,12 @@ school is counted once, under the first reason in this order:
 
 Counts shown on the page are unique schools.
 
+**"Hide schools with fewer than 30 students tested"** (checked on page load) is a display filter
+only. It hides plotted schools whose `tested` count, the denominator of the plotted rate, is under
+30. That is 157 schools, 18 of them "≥90%" FRP. The page lists them as a separate exclusion reason
+while the box is checked. Hidden schools stay searchable and selectable. The data file is
+unchanged.
+
 ## Limitations
 
 - **Different denominators.** X counts all enrolled students (October 1). Y counts students
