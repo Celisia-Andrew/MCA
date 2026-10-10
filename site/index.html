@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minnesota MCA Explorer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="viz-root">
+    <header>
+      <h1>School poverty and reading achievement, Minnesota 2026</h1>
+      <p class="sub">
+        One dot per school. 2026 Reading MCA/ALTMCA results for all students, all tested grades combined
+        (grades 3&ndash;8 and 10).
+      </p>
+    </header>
+
+    <section class="counts" aria-live="polite">
+      <p id="count-line">Loading data&hellip;</p>
+      <details id="exclusions" hidden>
+        <summary>Why are schools excluded?</summary>
+        <ul id="exclusion-list"></ul>
+        <p class="note">
+          Each excluded school is counted once, under the first reason that applies, in the order listed.
+          Excluded schools are not estimated or filled in.
+        </p>
+      </details>
+    </section>
+
+    <ul class="legend" aria-label="Legend">
+      <li><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" class="mark-exact"></circle></svg>
+        School with a published FRP percentage</li>
+      <li><svg width="14" height="14" aria-hidden="true"><path d="M3,2 L12,7 L3,12 Z" class="mark-ge90"></path></svg>
+        FRP published only as &ldquo;&ge;90%&rdquo; &mdash; plotted at the 90% line; exact value not published</li>
+    </ul>
+
+    <figure class="chart-wrap">
+      <div id="chart" role="img"
+           aria-label="Scatterplot of Minnesota schools: percent of students eligible for free or reduced-price meals versus percent of tested students meeting or exceeding Reading standards, 2026."></div>
+      <div id="tooltip" class="tooltip" role="status" hidden></div>
+    </figure>
+
+    <footer class="sources">
+      <h2>Data and definitions</h2>
+      <ul>
+        <li><strong>X-axis:</strong> percent of the school&rsquo;s total October 1, 2025 enrollment (all grades, PK&ndash;12)
+          eligible for free or reduced-price meals (FRP), as published by MDE.</li>
+        <li><strong>Y-axis:</strong> students at Meets or Advanced &divide; students with a valid score, across all tested grades.
+          Uses MDE&rsquo;s published all-grades counts, so each grade is weighted by the number of students tested.
+          Includes both the MCA-IV and the alternate assessment (ALTMCA-IV).</li>
+        <li>Schools are matched by district number, district type, and school number.</li>
+      </ul>
+      <p>Source: Minnesota Department of Education.</p>
+      <ul id="source-list"></ul>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
