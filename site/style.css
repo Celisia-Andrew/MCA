@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6f6e69;
+  --grid: #e4e3df;
+  --axis: #b9b8b2;
+  --band: #f1f0ec;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #d6d5d0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a9990;
+    --grid: #2e2e2c;
+    --axis: #55544f;
+    --band: #242423;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --tooltip-bg: #262625;
+    --tooltip-border: #3d3d3a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #9a9990;
+  --grid: #2e2e2c;
+  --axis: #55544f;
+  --band: #242423;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --tooltip-bg: #262625;
+  --tooltip-border: #3d3d3a;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+h2 { font-size: 1rem; margin: 0 0 8px; }
+.sub { margin: 0 0 16px; color: var(--text-secondary); }
+
+.counts { margin-bottom: 12px; }
+.counts p { margin: 0 0 4px; }
+#count-line strong { font-variant-numeric: tabular-nums; }
+details { color: var(--text-secondary); font-size: 0.93rem; }
+details summary { cursor: pointer; }
+details ul { margin: 6px 0; padding-left: 20px; }
+.note { margin: 4px 0 0; color: var(--text-muted); }
+
+.legend {
+  list-style: none; padding: 0; margin: 0 0 8px;
+  display: flex; flex-wrap: wrap; gap: 6px 20px;
+  color: var(--text-secondary); font-size: 0.9rem;
+}
+.legend li { display: flex; align-items: center; gap: 6px; }
+
+.chart-wrap { position: relative; margin: 0; }
+#chart svg { display: block; width: 100%; height: auto; touch-action: none; }
+
+.grid line { stroke: var(--grid); stroke-width: 1; }
+.axis line, .axis path { stroke: var(--axis); stroke-width: 1; }
+.axis text, .axis-title, .band-label { fill: var(--text-muted); font-size: 12px; }
+.axis-title { fill: var(--text-secondary); font-size: 13px; }
+.band { fill: var(--band); }
+.band-edge { stroke: var(--axis); stroke-width: 1; }
+
+.mark-exact { fill: var(--series-1); fill-opacity: 0.55; stroke: var(--surface-1); stroke-width: 1; }
+.mark-ge90 { fill: none; stroke: var(--series-2); stroke-width: 1.75; }
+.mark-active { fill-opacity: 1; stroke: var(--text-primary); stroke-width: 2; }
+path.mark-active { fill: none; stroke: var(--text-primary); }
+
+.tooltip {
+  position: absolute; pointer-events: none; z-index: 2;
+  min-width: 200px; max-width: 280px;
+  background: var(--tooltip-bg); border: 1px solid var(--tooltip-border); border-radius: 6px;
+  padding: 8px 10px; font-size: 0.85rem; color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.tooltip .t-school { font-weight: 600; }
+.tooltip .t-district { color: var(--text-secondary); margin-bottom: 4px; }
+.tooltip .t-row { color: var(--text-secondary); }
+.tooltip .t-row b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.sources { margin-top: 24px; color: var(--text-secondary); font-size: 0.9rem; }
+.sources ul { padding-left: 20px; margin: 0 0 8px; }
+.sources p { margin: 8px 0 4px; }
+.sources a { color: inherit; }
