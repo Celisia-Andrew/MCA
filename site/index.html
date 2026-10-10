@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minnesota MCA Explorer</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <main class="viz-root">
@@ -89,12 +89,26 @@
           tested) grade among those selected is excluded. Includes both the MCA-IV and the alternate assessment (ALTMCA-IV).</li>
         <li>Schools are matched by district number, district type, and school number.</li>
       </ul>
+      <section class="rc-note" aria-labelledby="rc-note-title">
+        <h3 id="rc-note-title">How these numbers compare to the Minnesota Report Card</h3>
+        <p>Results show students meeting or exceeding standards out of students tested, matching MDE&rsquo;s public
+          assessment files and the test results on each school&rsquo;s main Minnesota Report Card page.</p>
+        <p>The Report Card&rsquo;s &ldquo;Are students mastering standards?&rdquo; page shows a different measure: the North Star
+          accountability achievement rate. MDE calculates it by dividing students meeting or exceeding standards
+          &ldquo;by the number of students in tested grades&rdquo;
+          (<a href="https://education.mn.gov/MDE/dse/account/indicators/" target="_blank" rel="noopener noreferrer">MDE, Accountability Indicators</a>).
+          Students who did not take the test are &ldquo;counted the same as students who are &lsquo;Not Proficient&rsquo;&rdquo;
+          (<a href="https://education.mn.gov/mdeprod/groups/communications/documents/basic/bwrl/mdcz/~edisp/mde073110.pdf" target="_blank" rel="noopener noreferrer">MDE, Academic Achievement, December 2017</a>),
+          and the Report Card notes that students are &ldquo;included in the accountability system whether or not they took
+          the test&rdquo; (<a href="https://rc.education.mn.gov/" target="_blank" rel="noopener noreferrer">Minnesota Report Card</a>).
+          Because the accountability rate uses different inclusion rules, its numbers may differ from those shown here.</p>
+      </section>
       <p>Source: Minnesota Department of Education.</p>
       <ul id="source-list"></ul>
     </footer>
   </main>
-  <script src="search.js?v=7"></script>
-  <script src="grades.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="search.js?v=8"></script>
+  <script src="grades.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
