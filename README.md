@@ -20,6 +20,10 @@ python3 -m http.server 8000
 The `site/` folder is fully static (HTML, CSS, JS and one JSON file, no external libraries), so it
 can also be published as-is with GitHub Pages or any static host.
 
+When you change `style.css`, `search.js` or `app.js`, raise the `?v=` number on their links in
+`site/index.html`, for example `?v=5` to `?v=6`. Browsers then download the new files instead
+of reusing old saved copies.
+
 ## Rebuild the data and run the checks
 
 ```sh
