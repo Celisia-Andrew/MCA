@@ -125,16 +125,9 @@ function renderChart() {
   const ordered = DATA.schools.filter((s) => !s.frpGe90).concat(DATA.schools.filter((s) => s.frpGe90));
   for (const s of ordered) {
     const py = y(s.pct);
-    let node, px;
-    if (s.frpGe90) {
-      // Right-pointing triangle whose flat side sits on the 90% line: "90% or more".
-      px = x(GE90_X);
-      node = el("path", { class: "mark-ge90", d: `M${px},${py - 5} L${px + 9},${py} L${px},${py + 5} Z` }, marks);
-      px += 3;
-    } else {
-      px = x(s.frp);
-      node = el("circle", { class: "mark-exact", cx: px, cy: py, r: 4 }, marks);
-    }
+    // ">=90%" schools sit on the 90% line; their exact FRP is not published.
+    const px = s.frpGe90 ? x(GE90_X) : x(s.frp);
+    const node = el("circle", { class: "mark-exact", cx: px, cy: py, r: 4 }, marks);
     points.push({ s, px, py, node });
   }
 
