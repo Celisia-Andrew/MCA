@@ -6,6 +6,8 @@ const GE90_X = 90; // where schools published only as ">=90%" are drawn
 const HIT_RADIUS = 24; // px; nearest school within this distance is shown
 
 let DATA = null;
+let CHART = null; // { svg, marks, points } for the chart currently drawn
+const SELECTED = new Map(); // school id -> school, in the order selected
 
 function el(name, attrs = {}, parent) {
   const node = document.createElementNS(SVG_NS, name);
@@ -130,6 +132,8 @@ function renderChart() {
     const node = el("circle", { class: "mark-exact", cx: px, cy: py, r: 4 }, marks);
     points.push({ s, px, py, node });
   }
+  CHART = { svg, marks, points };
+  applySelection();
 
   // Nearest-point hover / tap.
   let active = null;
@@ -195,6 +199,232 @@ function fillTooltip(tip, s) {
   add("t-row", "Enrollment (Oct 1): ", fmtInt(s.enrolled));
 }
 
+// Fade unselected schools while any school is selected. Identity is the school id,
+// never the name or the plotted position. Positions and sizes are not changed.
+function applySelection() {
+  if (!CHART) return;
+  const any = SELECTED.size > 0;
+  CHART.svg.classList.toggle("has-selection", any);
+  for (const p of CHART.points) {
+    p.node.classList.toggle("is-selected", SELECTED.has(p.s.id));
+    CHART.marks.appendChild(p.node); // restore the default drawing order
+  }
+  // Draw selected schools last so overlapping dots cannot hide them.
+  for (const p of CHART.points) if (SELECTED.has(p.s.id)) CHART.marks.appendChild(p.node);
+}
+
+function initSearch(schools) {
+  const root = document.getElementById("school-search");
+  const input = document.getElementById("search-input");
+  const list = document.getElementById("search-list");
+  const clearBtn = document.getElementById("clear-all");
+  const status = document.getElementById("search-status");
+  const selection = document.getElementById("selection");
+  const countEl = document.getElementById("selection-count");
+  const chips = document.getElementById("chips");
+
+  const sorted = MCASearch.sortSchools(schools);
+  const nameCounts = new Map();
+  for (const s of schools) nameCounts.set(s.school, (nameCounts.get(s.school) || 0) + 1);
+  const optionId = (s) => `opt-${s.id}`;
+  let results = sorted;
+  let activeIndex = -1;
+  let suppressOpen = false;
+
+  function isOpen() {
+    return !list.hidden;
+  }
+  // Move focus to the input without opening the dropdown (focus events fire synchronously).
+  function focusInputQuietly() {
+    suppressOpen = true;
+    input.focus();
+    suppressOpen = false;
+  }
+  function open() {
+    if (isOpen()) return;
+    list.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    renderResults();
+  }
+  function close() {
+    list.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+  }
+
+  function renderResults() {
+    results = MCASearch.filterSchools(sorted, input.value);
+    activeIndex = -1;
+    input.removeAttribute("aria-activedescendant");
+    list.textContent = "";
+    list.scrollTop = 0;
+    if (results.length === 0) {
+      const li = document.createElement("li");
+      li.className = "search-empty";
+      li.textContent = "No matching schools";
+      list.appendChild(li);
+    } else {
+      const frag = document.createDocumentFragment();
+      results.forEach((s, i) => {
+        const li = document.createElement("li");
+        li.id = optionId(s);
+        li.className = "search-option";
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", String(SELECTED.has(s.id)));
+        li.dataset.index = String(i);
+        const name = document.createElement("span");
+        name.className = "opt-school";
+        name.textContent = s.school;
+        const district = document.createElement("span");
+        district.className = "opt-district";
+        district.textContent = s.district;
+        li.append(name, district);
+        frag.appendChild(li);
+      });
+      list.appendChild(frag);
+    }
+    status.textContent = results.length === 0
+      ? "No matching schools"
+      : `${fmtInt(results.length)} matching ${results.length === 1 ? "school" : "schools"}`;
+  }
+
+  function setActive(i) {
+    const prev = list.querySelector(".search-option.is-active");
+    if (prev) prev.classList.remove("is-active");
+    activeIndex = i;
+    if (i < 0) {
+      input.removeAttribute("aria-activedescendant");
+      return;
+    }
+    const li = document.getElementById(optionId(results[i]));
+    li.classList.add("is-active");
+    input.setAttribute("aria-activedescendant", li.id);
+    // Scroll only the list, never the page.
+    if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop;
+    else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight;
+    }
+  }
+
+  function toggle(s) {
+    if (SELECTED.has(s.id)) SELECTED.delete(s.id);
+    else SELECTED.set(s.id, s);
+    const li = document.getElementById(optionId(s));
+    if (li) li.setAttribute("aria-selected", String(SELECTED.has(s.id)));
+    update();
+  }
+
+  function update() {
+    applySelection();
+    renderChips();
+    clearBtn.disabled = SELECTED.size === 0 && input.value === "";
+  }
+
+  function renderChips() {
+    chips.textContent = "";
+    selection.hidden = SELECTED.size === 0;
+    countEl.textContent = `${fmtInt(SELECTED.size)} ${SELECTED.size === 1 ? "school" : "schools"} selected`;
+    for (const s of SELECTED.values()) {
+      const li = document.createElement("li");
+      li.className = "chip";
+      const label = document.createElement("span");
+      label.className = "chip-label";
+      label.textContent = s.school;
+      label.title = `${s.school}, ${s.district}`;
+      if (nameCounts.get(s.school) > 1) {
+        const d = document.createElement("span");
+        d.className = "chip-district";
+        d.textContent = ` (${s.district})`;
+        label.appendChild(d);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip-remove";
+      btn.dataset.id = s.id;
+      btn.setAttribute("aria-label", `Remove ${s.school}, ${s.district}`);
+      btn.textContent = "×";
+      li.append(label, btn);
+      chips.appendChild(li);
+    }
+  }
+
+  input.addEventListener("focus", () => {
+    if (!suppressOpen) open();
+  });
+  input.addEventListener("click", open);
+  input.addEventListener("input", () => {
+    if (isOpen()) renderResults();
+    else open();
+    clearBtn.disabled = SELECTED.size === 0 && input.value === "";
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); // keep the page from scrolling
+      if (!isOpen()) { open(); return; }
+      if (results.length === 0) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      const next = activeIndex < 0
+        ? (step === 1 ? 0 : results.length - 1)
+        : Math.min(results.length - 1, Math.max(0, activeIndex + step));
+      setActive(next);
+    } else if (e.key === "Enter") {
+      if (isOpen() && activeIndex >= 0) {
+        e.preventDefault();
+        toggle(results[activeIndex]);
+      }
+    } else if (e.key === "Escape") {
+      if (isOpen()) {
+        e.preventDefault();
+        close();
+      }
+    }
+  });
+
+  // Keep focus in the input while choosing, so several schools can be picked in a row.
+  list.addEventListener("mousedown", (e) => e.preventDefault());
+  list.addEventListener("click", (e) => {
+    const li = e.target.closest(".search-option");
+    if (!li) return;
+    const i = Number(li.dataset.index);
+    toggle(results[i]);
+    setActive(i);
+  });
+
+  chips.addEventListener("click", (e) => {
+    const btn = e.target.closest(".chip-remove");
+    if (!btn) return;
+    const s = SELECTED.get(btn.dataset.id);
+    if (!s) return;
+    const buttons = [...chips.querySelectorAll(".chip-remove")];
+    const pos = buttons.indexOf(btn);
+    toggle(s);
+    // Keep keyboard focus nearby: the next chip, else the previous one, else the input.
+    const rest = [...chips.querySelectorAll(".chip-remove")];
+    const target = rest[Math.min(pos, rest.length - 1)];
+    if (target) target.focus();
+    else focusInputQuietly();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    SELECTED.clear();
+    input.value = "";
+    close();
+    update();
+    focusInputQuietly();
+  });
+
+  // Close when the pointer or focus moves outside the search control.
+  document.addEventListener("pointerdown", (e) => {
+    if (!root.contains(e.target)) close();
+  });
+  root.addEventListener("focusout", (e) => {
+    if (!e.relatedTarget || !root.contains(e.relatedTarget)) close();
+  });
+
+  root.hidden = false;
+  update();
+}
+
 async function main() {
   try {
     const res = await fetch("data/schools.json");
@@ -208,6 +438,7 @@ async function main() {
   renderCounts(DATA.meta);
   renderSources(DATA.meta);
   renderChart();
+  initSearch(DATA.schools);
   let t;
   window.addEventListener("resize", () => {
     clearTimeout(t);

@@ -36,6 +36,28 @@
         Dots on the 90% line: FRP published only as &ldquo;&ge;90%&rdquo;; exact value not published</li>
     </ul>
 
+    <div class="school-search" id="school-search" hidden>
+      <label for="search-input" class="search-label">Find and highlight schools</label>
+      <div class="search-row">
+        <div class="search-box">
+          <input id="search-input" type="text" role="combobox" autocomplete="off" spellcheck="false"
+                 placeholder="School or district name" aria-autocomplete="list" aria-expanded="false"
+                 aria-controls="search-list" aria-describedby="search-help">
+          <ul id="search-list" class="search-list" role="listbox" aria-multiselectable="true"
+              aria-label="Matching schools" hidden></ul>
+        </div>
+        <button type="button" id="clear-all" class="clear-all" disabled>Clear all</button>
+      </div>
+      <p id="search-help" class="visually-hidden">
+        Type to filter. Use the up and down arrow keys to move through results, Enter to select or deselect, and Escape to close.
+      </p>
+      <p id="search-status" class="visually-hidden" aria-live="polite"></p>
+      <div id="selection" class="selection" hidden>
+        <p id="selection-count" class="selection-count"></p>
+        <ul id="chips" class="chips" aria-label="Selected schools"></ul>
+      </div>
+    </div>
+
     <figure class="chart-wrap">
       <div id="chart" role="img"
            aria-label="Scatterplot of Minnesota schools: percent of students eligible for free or reduced-price meals versus percent of tested students meeting or exceeding Reading standards, 2026."></div>
@@ -56,6 +78,7 @@
       <ul id="source-list"></ul>
     </footer>
   </main>
+  <script src="search.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
