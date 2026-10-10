@@ -194,3 +194,18 @@ details ul { margin: 6px 0; padding-left: 20px; }
 }
 .tooltip-close:hover { background: var(--band); color: var(--text-primary); }
 .tooltip-close:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+
+/* Grade checkboxes, in one row with the school search (wraps on narrow screens) */
+.chart-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: 8px 24px; margin-bottom: 10px;
+}
+.chart-controls .school-search { margin-bottom: 0; }
+.grade-picker { border: 0; margin: 0; padding: 0; min-width: 0; font-size: 0.9rem; color: var(--text-secondary); }
+.grade-picker legend { padding: 0; margin-bottom: 4px; font-weight: 600; color: var(--text-primary); }
+.grade-boxes { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.grade-box { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; cursor: pointer; color: var(--text-primary); }
+.grade-box input { width: 16px; height: 16px; margin: 0; accent-color: var(--series-1); }
+.grade-box input:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.grade-box input:disabled { cursor: not-allowed; }
+.grade-box:has(input:disabled) { cursor: not-allowed; }

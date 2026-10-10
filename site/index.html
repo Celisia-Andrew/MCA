@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minnesota MCA Explorer</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <main class="viz-root">
     <header>
       <h1>School poverty and reading achievement, Minnesota 2026</h1>
       <p class="sub">
-        One dot per school. 2026 Reading MCA/ALTMCA results for all students, all tested grades combined
-        (grades 3&ndash;8 and 10).
+        One dot per school. 2026 Reading MCA/ALTMCA results for all students,
+        <span id="grade-desc">all tested grades combined (grades 3&ndash;8 and 10)</span>.
       </p>
     </header>
 
@@ -25,6 +25,8 @@
         <p class="note">
           Each excluded school is counted once, under the first reason that applies, in the order listed.
           Excluded schools are not estimated or filled in.
+          When a school&rsquo;s full set of tested grades is selected, its value comes from MDE&rsquo;s published
+          all-grades figure, which includes students in grades too small to report individually.
         </p>
       </details>
     </section>
@@ -35,6 +37,12 @@
       <li><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.5" class="mark-exact"></circle></svg>
         Dots on the 90% line: FRP published only as &ldquo;&ge;90%&rdquo;; exact value not published</li>
     </ul>
+
+    <div class="chart-controls">
+    <fieldset class="grade-picker" id="grade-picker" hidden>
+      <legend>Grades</legend>
+      <div class="grade-boxes" id="grade-boxes"></div>
+    </fieldset>
 
     <div class="school-search" id="school-search" hidden>
       <label for="search-input" class="search-label">Find and highlight schools</label>
@@ -57,6 +65,7 @@
         <ul id="chips" class="chips" aria-label="Selected schools"></ul>
       </div>
     </div>
+    </div>
 
     <figure class="chart-wrap">
       <div id="chart" role="img"
@@ -65,7 +74,7 @@
     </figure>
     <p class="chart-option">
       <label><input type="checkbox" id="hide-small" checked autocomplete="off">
-        Hide schools with fewer than 30 students tested</label>
+        <span id="hide-small-text">Hide schools with fewer than 30 students tested</span></label>
     </p>
 
     <footer class="sources">
@@ -73,16 +82,19 @@
       <ul>
         <li><strong>X-axis:</strong> percent of the school&rsquo;s total October 1, 2025 enrollment (all grades, PK&ndash;12)
           eligible for free or reduced-price meals (FRP), as published by MDE.</li>
-        <li><strong>Y-axis:</strong> students at Meets or Advanced &divide; students with a valid score, across all tested grades.
-          Uses MDE&rsquo;s published all-grades counts, so each grade is weighted by the number of students tested.
-          Includes both the MCA-IV and the alternate assessment (ALTMCA-IV).</li>
+        <li><strong>Y-axis:</strong> students at Meets or Advanced &divide; students with a valid score, across the selected grades,
+          so each grade is weighted by the number of students tested. When the selected grades include every grade a school
+          tests, the value is MDE&rsquo;s published all-grades figure, which includes students in grades too small to report
+          individually; otherwise it is summed from MDE&rsquo;s grade-level counts, and a school with a suppressed (fewer than 10
+          tested) grade among those selected is excluded. Includes both the MCA-IV and the alternate assessment (ALTMCA-IV).</li>
         <li>Schools are matched by district number, district type, and school number.</li>
       </ul>
       <p>Source: Minnesota Department of Education.</p>
       <ul id="source-list"></ul>
     </footer>
   </main>
-  <script src="search.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="search.js?v=7"></script>
+  <script src="grades.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
