@@ -10,6 +10,7 @@ let CHART = null; // { svg, marks, points } for the chart currently drawn
 const SELECTED = new Map(); // school id -> school, in the order selected
 const MIN_TESTED = 30; // "Hide small schools" threshold, in students tested (the plotted rate's denominator)
 let hideSmall = true; // display filter only; the data is never changed
+let PINNED_ID = null; // id of the school whose pop-up is pinned by a click, if any
 
 function isHiddenSchool(s) {
   return hideSmall && MCASearch.isSmallSchool(s, MIN_TESTED);
@@ -147,20 +148,31 @@ function renderChart() {
   CHART = { svg, marks, points };
   applySelection();
 
-  // Nearest-point hover / tap.
+  // Nearest-point hover / tap. Clicking a dot pins its pop-up; while pinned, hover is off.
   let active = null;
   function clear() {
     if (active) active.node.classList.remove("mark-active");
     active = null;
     tooltip.hidden = true;
+    tooltip.classList.remove("is-pinned");
   }
-  function show(p) {
+  function show(p, pinned = false) {
     if (active === p) return;
     clear();
     active = p;
     p.node.classList.add("mark-active");
     marks.appendChild(p.node); // bring to front
     fillTooltip(tooltip, p.s);
+    if (pinned) {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "tooltip-close";
+      close.setAttribute("aria-label", "Close");
+      close.textContent = "\u00d7";
+      close.addEventListener("click", unpin);
+      tooltip.appendChild(close);
+      tooltip.classList.add("is-pinned");
+    }
     tooltip.hidden = false;
     const scale = host.clientWidth / width;
     const left = p.px * scale;
@@ -170,7 +182,7 @@ function renderChart() {
     tooltip.style.left = `${Math.min(Math.max(0, left + 12 + tw > host.clientWidth ? left - tw - 12 : left + 12), host.clientWidth - tw)}px`;
     tooltip.style.top = `${Math.max(0, top - th - 12)}px`;
   }
-  function onMove(evt) {
+  function nearest(evt) {
     const rect = svg.getBoundingClientRect();
     const scale = width / rect.width;
     const mx = (evt.clientX - rect.left) * scale;
@@ -181,11 +193,39 @@ function renderChart() {
       const d = (p.px - mx) ** 2 + (p.py - my) ** 2;
       if (d < bestD) { bestD = d; best = p; }
     }
+    return best;
+  }
+  function onMove(evt) {
+    if (PINNED_ID) return;
+    const best = nearest(evt);
     if (best) show(best); else clear();
+  }
+  function pin(p) {
+    PINNED_ID = p.s.id;
+    clear();
+    show(p, true);
+  }
+  function unpin() {
+    PINNED_ID = null;
+    clear();
   }
   svg.addEventListener("pointermove", onMove);
   svg.addEventListener("pointerdown", onMove);
-  svg.addEventListener("pointerleave", clear);
+  svg.addEventListener("pointerleave", () => { if (!PINNED_ID) clear(); });
+  // Click a dot to pin it; click the pinned dot or empty chart area to unpin.
+  svg.addEventListener("click", (evt) => {
+    const best = nearest(evt);
+    if (!best || best.s.id === PINNED_ID) unpin();
+    else pin(best);
+  });
+  CHART.unpin = unpin;
+
+  // After a redraw (resize, small-schools checkbox), keep the pin on its dot,
+  // or close it if that school is no longer drawn.
+  if (PINNED_ID) {
+    const p = points.find((q) => q.s.id === PINNED_ID);
+    if (p) pin(p); else unpin();
+  }
 }
 
 function fillTooltip(tip, s) {
@@ -483,6 +523,20 @@ async function main() {
   renderSources(DATA.meta);
   renderChart();
   const refreshHidden = initSearch(DATA.schools);
+
+  // Close a pinned pop-up on a click outside it and outside the chart's dots
+  // (clicks on the chart itself are handled in renderChart), or on Escape.
+  const tooltip = document.getElementById("tooltip");
+  document.addEventListener("pointerdown", (e) => {
+    if (!PINNED_ID || !CHART) return;
+    if (tooltip.contains(e.target) || CHART.svg.contains(e.target)) return;
+    CHART.unpin();
+  });
+  document.addEventListener("keydown", (e) => {
+    // The search box marks an Escape it used (to close its list) with preventDefault.
+    if (e.key !== "Escape" || e.defaultPrevented || !PINNED_ID || !CHART) return;
+    CHART.unpin();
+  });
   const hideBox = document.getElementById("hide-small");
   hideBox.checked = true; // checked on every page load
   hideBox.addEventListener("change", () => {
