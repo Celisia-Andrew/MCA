@@ -1,4 +1,4 @@
-// Unit tests for site/search.js (school search filtering and sorting).
+// Unit tests for site/search.js (school search filtering/sorting and the small-school rule).
 // Run from the repository root:  node --test tests/test_search.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
-const { sortSchools, filterSchools } = require("../site/search.js");
+const { sortSchools, filterSchools, isSmallSchool, countSmallSchools } = require("../site/search.js");
 const schools = JSON.parse(readFileSync(new URL("../site/data/schools.json", import.meta.url), "utf8")).schools;
 const sorted = sortSchools(schools);
 
@@ -58,4 +58,23 @@ test("filtering does not change the data", () => {
   filterSchools(sorted, "elementary");
   sortSchools(schools);
   assert.equal(JSON.stringify(schools), before);
+});
+
+test("small-school rule uses students tested (the rate's denominator), strictly fewer than 30", () => {
+  for (const s of schools) assert.ok(Number.isInteger(s.tested), `${s.school} has no tested count`);
+  const bigStone = schools.find((s) => s.school === "Big Stone Colony Elementary");
+  assert.equal(bigStone.tested, 11);
+  assert.ok(isSmallSchool(bigStone, 30));
+  const thirty = schools.filter((s) => s.tested === 30);
+  assert.ok(thirty.length > 0);
+  for (const s of thirty) assert.ok(!isSmallSchool(s, 30), `${s.school} has exactly 30 tested`);
+  assert.ok(!isSmallSchool({ tested: 30, enrolled: 5 }, 30), "enrollment is not used");
+  assert.ok(isSmallSchool({ tested: 29, enrolled: 5000 }, 30), "enrollment is not used");
+});
+
+test("threshold of 30 hides 157 schools, 18 of them with FRP published as >=90%", () => {
+  assert.deepEqual(countSmallSchools(schools, 30), { count: 157, ge90: 18 });
+  const expected = schools.filter((s) => s.tested < 30);
+  assert.equal(expected.length, 157);
+  assert.equal(expected.filter((s) => s.frpGe90).length, 18);
 });

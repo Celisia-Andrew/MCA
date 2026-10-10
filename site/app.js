@@ -8,6 +8,12 @@ const HIT_RADIUS = 24; // px; nearest school within this distance is shown
 let DATA = null;
 let CHART = null; // { svg, marks, points } for the chart currently drawn
 const SELECTED = new Map(); // school id -> school, in the order selected
+const MIN_TESTED = 30; // "Hide small schools" threshold, in students tested (the plotted rate's denominator)
+let hideSmall = true; // display filter only; the data is never changed
+
+function isHiddenSchool(s) {
+  return hideSmall && MCASearch.isSmallSchool(s, MIN_TESTED);
+}
 
 function el(name, attrs = {}, parent) {
   const node = document.createElementNS(SVG_NS, name);
@@ -27,12 +33,14 @@ function frpLabel(s) {
 
 function renderCounts(meta) {
   const ex = meta.excluded;
-  const excludedTotal = Object.values(ex).reduce((a, b) => a + b, 0);
+  // Schools hidden by the "Hide small schools" checkbox (none when it is unchecked).
+  const small = hideSmall ? MCASearch.countSmallSchools(DATA.schools, MIN_TESTED) : { count: 0, ge90: 0 };
+  const excludedTotal = Object.values(ex).reduce((a, b) => a + b, 0) + small.count;
   const line = document.getElementById("count-line");
   line.textContent = "";
   const parts = [
-    ["Schools plotted: ", fmtInt(meta.plotted)],
-    [` (including ${fmtInt(meta.plottedGe90)} with FRP published as “≥90%”). Excluded: `, fmtInt(excludedTotal)],
+    ["Schools plotted: ", fmtInt(meta.plotted - small.count)],
+    [` (including ${fmtInt(meta.plottedGe90 - small.ge90)} with FRP published as “≥90%”). Excluded: `, fmtInt(excludedTotal)],
     [` of ${fmtInt(meta.totalSchoolsWithResults)} schools with 2026 Reading results.`, null],
   ];
   for (const [text, num] of parts) {
@@ -50,6 +58,9 @@ function renderCounts(meta) {
     [ex.frp_suppressed_small_enrollment, "FRP not published: enrollment under 10"],
     [ex.frp_suppressed_complementary, "FRP not published: MDE privacy suppression (complementary suppression)"],
   ];
+  if (hideSmall) {
+    reasons.push([small.count, `fewer than ${MIN_TESTED} students tested (hidden by the checkbox below the chart)`]);
+  }
   const list = document.getElementById("exclusion-list");
   list.textContent = "";
   for (const [n, why] of reasons) {
@@ -126,6 +137,7 @@ function renderChart() {
   const points = [];
   const ordered = DATA.schools.filter((s) => !s.frpGe90).concat(DATA.schools.filter((s) => s.frpGe90));
   for (const s of ordered) {
+    if (isHiddenSchool(s)) continue; // removed from the chart, not faded
     const py = y(s.pct);
     // ">=90%" schools sit on the 90% line; their exact FRP is not published.
     const px = s.frpGe90 ? x(GE90_X) : x(s.frp);
@@ -203,7 +215,8 @@ function fillTooltip(tip, s) {
 // never the name or the plotted position. Positions and sizes are not changed.
 function applySelection() {
   if (!CHART) return;
-  const any = SELECTED.size > 0;
+  // Fade only while a selected school is actually drawn (a selected school can be hidden).
+  const any = CHART.points.some((p) => SELECTED.has(p.s.id));
   CHART.svg.classList.toggle("has-selection", any);
   for (const p of CHART.points) {
     p.node.classList.toggle("is-selected", SELECTED.has(p.s.id));
@@ -279,6 +292,7 @@ function initSearch(schools) {
         district.className = "opt-district";
         district.textContent = s.district;
         li.append(name, district);
+        markHidden(li, s);
         frag.appendChild(li);
       });
       list.appendChild(frag);
@@ -286,6 +300,21 @@ function initSearch(schools) {
     status.textContent = results.length === 0
       ? "No matching schools"
       : `${fmtInt(results.length)} matching ${results.length === 1 ? "school" : "schools"}`;
+  }
+
+  // Hidden small schools stay searchable and selectable, shown grayed out with a note.
+  function markHidden(li, s) {
+    const hidden = isHiddenSchool(s);
+    li.classList.toggle("is-hidden", hidden);
+    let note = li.querySelector(".opt-note");
+    if (hidden && !note) {
+      note = document.createElement("span");
+      note.className = "opt-note";
+      note.textContent = `Hidden: fewer than ${MIN_TESTED} tested`;
+      li.appendChild(note);
+    } else if (!hidden && note) {
+      note.remove();
+    }
   }
 
   function setActive(i) {
@@ -337,11 +366,20 @@ function initSearch(schools) {
         d.textContent = ` (${s.district})`;
         label.appendChild(d);
       }
+      const hidden = isHiddenSchool(s);
+      if (hidden) {
+        li.classList.add("is-hidden");
+        const h = document.createElement("span");
+        h.className = "chip-hidden";
+        h.textContent = " · hidden";
+        label.appendChild(h);
+        label.title += ` (hidden: fewer than ${MIN_TESTED} tested)`;
+      }
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "chip-remove";
       btn.dataset.id = s.id;
-      btn.setAttribute("aria-label", `Remove ${s.school}, ${s.district}`);
+      btn.setAttribute("aria-label", `Remove ${s.school}, ${s.district}${hidden ? " (hidden from chart)" : ""}`);
       btn.textContent = "×";
       li.append(label, btn);
       chips.appendChild(li);
@@ -423,6 +461,12 @@ function initSearch(schools) {
 
   root.hidden = false;
   update();
+
+  // Called when the "Hide small schools" checkbox changes; selections are kept.
+  return function refreshHidden() {
+    for (const li of list.querySelectorAll(".search-option")) markHidden(li, results[Number(li.dataset.index)]);
+    renderChips();
+  };
 }
 
 async function main() {
@@ -438,7 +482,15 @@ async function main() {
   renderCounts(DATA.meta);
   renderSources(DATA.meta);
   renderChart();
-  initSearch(DATA.schools);
+  const refreshHidden = initSearch(DATA.schools);
+  const hideBox = document.getElementById("hide-small");
+  hideBox.checked = true; // checked on every page load
+  hideBox.addEventListener("change", () => {
+    hideSmall = hideBox.checked;
+    renderCounts(DATA.meta);
+    renderChart(); // re-applies the selection
+    refreshHidden();
+  });
   let t;
   window.addEventListener("resize", () => {
     clearTimeout(t);

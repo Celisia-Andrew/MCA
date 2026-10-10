@@ -173,3 +173,14 @@ details ul { margin: 6px 0; padding-left: 20px; }
 .has-selection .mark-exact { fill-opacity: 0.12; }
 .has-selection .mark-exact.is-selected,
 .has-selection .mark-exact.mark-active { fill-opacity: 1; }
+
+/* "Hide small schools" checkbox and hidden-school marks in search */
+.chart-option { margin: 8px 0 0; font-size: 0.9rem; color: var(--text-secondary); }
+.chart-option label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.chart-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--series-1); }
+.chart-option input:focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.search-option.is-hidden .opt-school,
+.search-option.is-hidden .opt-district { color: var(--text-muted); opacity: 0.75; }
+.opt-note { color: var(--text-muted); font-size: 0.75rem; font-style: italic; }
+.chip.is-hidden { border-style: dashed; color: var(--text-muted); }
+.chip-hidden { font-style: italic; }
