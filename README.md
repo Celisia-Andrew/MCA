@@ -66,7 +66,7 @@ Both from the Minnesota Department of Education (MDE):
   limited to tested grades.
 - It is used as published.
 - Values MDE publishes only as `>=90%` are kept:
-  - They are drawn as orange outline triangles on the 90% line, inside a shaded "≥90%" band.
+  - They are drawn as the same blue dots as other schools, on the 90% line, inside a shaded "≥90%" band.
   - Their tooltip reads `FRP: >=90%`.
   - Every exact value MDE publishes is below 90%, so these markers never coincide with an exact
     90% school.
