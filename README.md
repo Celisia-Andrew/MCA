@@ -26,6 +26,7 @@ can also be published as-is with GitHub Pages or any static host.
 pip install -r requirements.txt
 python3 scripts/build_data.py              # reads data/*.xlsb|xlsx, writes site/data/schools.json
 python3 -m unittest discover -s tests -v   # about 30 seconds
+node --test tests/test_search.mjs          # school search rules (Node 18+, no installs)
 ```
 
 The source workbooks in `data/` are read only, never modified. The build stops with an error if the
