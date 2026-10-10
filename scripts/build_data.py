@@ -19,6 +19,11 @@ Rules (see README.md for the rationale):
     Numeric values are used as published; ">=90%" is kept as a flagged value;
     blank (suppressed) values are excluded, never estimated.
   * Join key: (District Number, District Type, School Number) as integers.
+  * Grade-level results (for the grade checkboxes): for every plotted school,
+    one row per tested grade from the same sheet and student group, keyed by
+    (school id, grade, group). `met` = Count Level M + Count Level A, or null
+    when MDE suppressed the row (Filter All = "Y"); `tested` is always
+    published. Only the "all" (All students) group is included for now.
 
 The script stops with an error if the workbook structure does not support
 these rules.
@@ -196,6 +201,7 @@ def build():
         })
 
     check(len({s["id"] for s in schools}) == len(schools), "Duplicate schools in output")
+    grade_rows = build_grade_rows(reading, schools)
     total = len(g0)
     check(len(schools) + sum(excluded.values()) == total, "Plotted + excluded != total schools")
 
@@ -205,6 +211,7 @@ def build():
             "dataYear": "2025-26",
             "studentGroup": "All students",
             "grades": "All tested grades (3-8, 10) combined",
+            "gradeList": sorted(TESTED_GRADES),
             "totalSchoolsWithResults": total,
             "plotted": len(schools),
             "plottedGe90": sum(s["frpGe90"] for s in schools),
@@ -224,12 +231,55 @@ def build():
             ],
         },
         "schools": sorted(schools, key=lambda s: s["id"]),
+        "gradeResults": {
+            "fields": ["id", "grade", "group", "tested", "met"],
+            "groups": {"all": "All students"},
+            "rows": grade_rows,
+        },
     }
     return out
 
 
+def build_grade_rows(reading, schools):
+    """Grade-level rows for plotted schools, checked against each school's all-grades row."""
+    by_id = {s["id"]: s for s in schools}
+    g = reading[reading["Grade"] != ALL_GRADES].copy()
+    g["id"] = g[KEY].astype(str).agg("-".join, axis=1)
+    g = g[g["id"].isin(by_id)].sort_values(["id", "Grade"])
+    rows = []
+    for r in g.to_dict("records"):
+        tested = int(r["Total Tested"])
+        if r["Filter All"] == "Y":
+            met = None  # suppressed by MDE (fewer than 10 tested); tested is still published
+        else:
+            met = int(r["Count Level M"]) + int(r["Count Level A"])
+        rows.append([r["id"], int(r["Grade"]), "all", tested, met])
+
+    # Grade rows must add up to the all-grades row: tested always, met where nothing is suppressed.
+    sums = {}
+    for sid, _, _, tested, met in rows:
+        t = sums.setdefault(sid, {"tested": 0, "met": 0, "suppressed": False})
+        t["tested"] += tested
+        if met is None:
+            t["suppressed"] = t["suppressed"] or tested > 0
+        else:
+            t["met"] += met
+    check(set(sums) == set(by_id), "Plotted school without grade rows")
+    for sid, t in sums.items():
+        s = by_id[sid]
+        check(t["tested"] == s["tested"], f"Grade tested counts do not sum to all-grades row for {sid}")
+        if not t["suppressed"]:
+            check(t["met"] == s["met"], f"Grade met counts do not sum to all-grades row for {sid}")
+    return rows
+
+
 def to_json(out):
-    return json.dumps(out, indent=1, ensure_ascii=False, allow_nan=False) + "\n"
+    # Grade rows are written one per line to keep the file compact and readable.
+    rows = out["gradeResults"]["rows"]
+    body = dict(out, gradeResults=dict(out["gradeResults"], rows="__ROWS__"))
+    text = json.dumps(body, indent=1, ensure_ascii=False, allow_nan=False)
+    packed = ",\n".join("  " + json.dumps(r, ensure_ascii=False, allow_nan=False, separators=(",", ":")) for r in rows)
+    return text.replace('"__ROWS__"', "[\n" + packed + "\n ]") + "\n"
 
 
 if __name__ == "__main__":

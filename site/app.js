@@ -8,12 +8,35 @@ const HIT_RADIUS = 24; // px; nearest school within this distance is shown
 let DATA = null;
 let CHART = null; // { svg, marks, points } for the chart currently drawn
 const SELECTED = new Map(); // school id -> school, in the order selected
-const MIN_TESTED = 30; // "Hide small schools" threshold, in students tested (the plotted rate's denominator)
 let hideSmall = true; // display filter only; the data is never changed
 let PINNED_ID = null; // id of the school whose pop-up is pinned by a click, if any
+let GRADE_INDEX = null; // school id -> Map(grade -> { tested, met }) for All students
+const CHECKED = new Set(); // grades whose checkbox is checked
+let VIEW = null; // MCAGrades.computeView() result for the checked grades and small-schools option
+
+function recomputeView() {
+  VIEW = MCAGrades.computeView(DATA.schools, GRADE_INDEX, CHECKED, hideSmall);
+}
+
+function valueOf(s) {
+  return VIEW.values.get(s.id);
+}
 
 function isHiddenSchool(s) {
-  return hideSmall && MCASearch.isSmallSchool(s, MIN_TESTED);
+  return valueOf(s).status !== "ok";
+}
+
+function allGradesChecked() {
+  return CHECKED.size === DATA.meta.gradeList.length;
+}
+
+// Short reason shown in search results and chips for a school that is not plotted.
+function hiddenNote(s) {
+  const status = valueOf(s).status;
+  if (status === "small") return `Hidden: fewer than ${VIEW.cutoff} tested`;
+  if (status === "suppressed") return "Hidden: data suppressed for selected grades";
+  if (status === "none") return "No data for selected grades";
+  return "";
 }
 
 function el(name, attrs = {}, parent) {
@@ -34,14 +57,14 @@ function frpLabel(s) {
 
 function renderCounts(meta) {
   const ex = meta.excluded;
-  // Schools hidden by the "Hide small schools" checkbox (none when it is unchecked).
-  const small = hideSmall ? MCASearch.countSmallSchools(DATA.schools, MIN_TESTED) : { count: 0, ge90: 0 };
-  const excludedTotal = Object.values(ex).reduce((a, b) => a + b, 0) + small.count;
+  // Schools not plotted under the checked grades or hidden by the small-schools checkbox.
+  const c = VIEW.counts;
+  const excludedTotal = Object.values(ex).reduce((a, b) => a + b, 0) + c.none + c.suppressed + c.small;
   const line = document.getElementById("count-line");
   line.textContent = "";
   const parts = [
-    ["Schools plotted: ", fmtInt(meta.plotted - small.count)],
-    [` (including ${fmtInt(meta.plottedGe90 - small.ge90)} with FRP published as “≥90%”). Excluded: `, fmtInt(excludedTotal)],
+    ["Schools plotted: ", fmtInt(c.plotted)],
+    [` (including ${fmtInt(c.plottedGe90)} with FRP published as “≥90%”). Excluded: `, fmtInt(excludedTotal)],
     [` of ${fmtInt(meta.totalSchoolsWithResults)} schools with 2026 Reading results.`, null],
   ];
   for (const [text, num] of parts) {
@@ -59,8 +82,12 @@ function renderCounts(meta) {
     [ex.frp_suppressed_small_enrollment, "FRP not published: enrollment under 10"],
     [ex.frp_suppressed_complementary, "FRP not published: MDE privacy suppression (complementary suppression)"],
   ];
+  if (!allGradesChecked()) {
+    reasons.push([c.none, "no students tested in selected grades"]);
+    reasons.push([c.suppressed, "data suppressed for one or more selected grades"]);
+  }
   if (hideSmall) {
-    reasons.push([small.count, `fewer than ${MIN_TESTED} students tested (hidden by the checkbox below the chart)`]);
+    reasons.push([c.small, `fewer than ${VIEW.cutoff} students tested (hidden by the checkbox below the chart)`]);
   }
   const list = document.getElementById("exclusion-list");
   list.textContent = "";
@@ -138,8 +165,9 @@ function renderChart() {
   const points = [];
   const ordered = DATA.schools.filter((s) => !s.frpGe90).concat(DATA.schools.filter((s) => s.frpGe90));
   for (const s of ordered) {
-    if (isHiddenSchool(s)) continue; // removed from the chart, not faded
-    const py = y(s.pct);
+    const v = valueOf(s);
+    if (v.status !== "ok") continue; // removed from the chart, not faded
+    const py = y(v.pct);
     // ">=90%" schools sit on the 90% line; their exact FRP is not published.
     const px = s.frpGe90 ? x(GE90_X) : x(s.frp);
     const node = el("circle", { class: "mark-exact", cx: px, cy: py, r: 4 }, marks);
@@ -220,8 +248,8 @@ function renderChart() {
   });
   CHART.unpin = unpin;
 
-  // After a redraw (resize, small-schools checkbox), keep the pin on its dot,
-  // or close it if that school is no longer drawn.
+  // After a redraw (resize, small-schools checkbox), keep the pin on its dot, or close it
+  // if that school is no longer drawn. A grade change clears PINNED_ID first, so it closes.
   if (PINNED_ID) {
     const p = points.find((q) => q.s.id === PINNED_ID);
     if (p) pin(p); else unpin();
@@ -246,8 +274,10 @@ function fillTooltip(tip, s) {
   add("t-school", null, s.school);
   add("t-district", null, s.district);
   add("t-row", "FRP: ", frpLabel(s));
-  add("t-row", "Meeting or exceeding: ", `${s.pct.toFixed(1)}%`);
-  add("t-row", "Students: ", `${fmtInt(s.met)} of ${fmtInt(s.tested)} tested`);
+  const v = valueOf(s); // values for the checked grades
+  add("t-row", "Meeting or exceeding: ", `${v.pct.toFixed(1)}%`);
+  add("t-row", "Students: ", `${fmtInt(v.met)} of ${fmtInt(v.tested)} tested`);
+  add("t-row", v.grades.length > 1 ? "Grades: " : "Grade: ", MCAGrades.formatGrades(v.grades));
   add("t-row", "Enrollment (Oct 1): ", fmtInt(s.enrolled));
 }
 
@@ -342,17 +372,19 @@ function initSearch(schools) {
       : `${fmtInt(results.length)} matching ${results.length === 1 ? "school" : "schools"}`;
   }
 
-  // Hidden small schools stay searchable and selectable, shown grayed out with a note.
+  // Schools not plotted stay searchable and selectable, shown grayed out with a reason.
   function markHidden(li, s) {
     const hidden = isHiddenSchool(s);
     li.classList.toggle("is-hidden", hidden);
     let note = li.querySelector(".opt-note");
-    if (hidden && !note) {
-      note = document.createElement("span");
-      note.className = "opt-note";
-      note.textContent = `Hidden: fewer than ${MIN_TESTED} tested`;
-      li.appendChild(note);
-    } else if (!hidden && note) {
+    if (hidden) {
+      if (!note) {
+        note = document.createElement("span");
+        note.className = "opt-note";
+        li.appendChild(note);
+      }
+      note.textContent = hiddenNote(s);
+    } else if (note) {
       note.remove();
     }
   }
@@ -413,7 +445,7 @@ function initSearch(schools) {
         h.className = "chip-hidden";
         h.textContent = " · hidden";
         label.appendChild(h);
-        label.title += ` (hidden: fewer than ${MIN_TESTED} tested)`;
+        label.title += ` (${hiddenNote(s)})`;
       }
       const btn = document.createElement("button");
       btn.type = "button";
@@ -502,7 +534,7 @@ function initSearch(schools) {
   root.hidden = false;
   update();
 
-  // Called when the "Hide small schools" checkbox changes; selections are kept.
+  // Called when the grades or the "Hide small schools" checkbox change; selections are kept.
   return function refreshHidden() {
     for (const li of list.querySelectorAll(".search-option")) markHidden(li, results[Number(li.dataset.index)]);
     renderChips();
@@ -519,6 +551,9 @@ async function main() {
       `Could not load data/schools.json (${err.message}). Serve the site folder over HTTP; see README.`;
     return;
   }
+  GRADE_INDEX = MCAGrades.indexGradeResults(DATA.gradeResults, "all");
+  for (const g of DATA.meta.gradeList) CHECKED.add(g); // all grades checked on load
+  recomputeView();
   renderCounts(DATA.meta);
   renderSources(DATA.meta);
   renderChart();
@@ -538,13 +573,57 @@ async function main() {
     CHART.unpin();
   });
   const hideBox = document.getElementById("hide-small");
+  const hideText = document.getElementById("hide-small-text");
+  const gradeDesc = document.getElementById("grade-desc");
   hideBox.checked = true; // checked on every page load
-  hideBox.addEventListener("change", () => {
-    hideSmall = hideBox.checked;
+
+  // Recompute values and redraw everything that depends on the grades or the small-schools option.
+  function refreshView() {
+    recomputeView();
+    hideText.textContent = `Hide schools with fewer than ${VIEW.cutoff} students tested`;
+    const checked = [...CHECKED].sort((a, b) => a - b);
+    gradeDesc.textContent = allGradesChecked()
+      ? `all tested grades combined (${MCAGrades.gradeWord(checked)})`
+      : `${MCAGrades.gradeWord(checked)}${checked.length > 1 ? " combined" : ""}`;
     renderCounts(DATA.meta);
     renderChart(); // re-applies the selection
     refreshHidden();
+  }
+  hideBox.addEventListener("change", () => {
+    hideSmall = hideBox.checked;
+    refreshView();
   });
+
+  // Grade checkboxes: one per tested grade, all checked; the last checked one can't be unchecked.
+  const boxes = document.getElementById("grade-boxes");
+  const gradeInputs = DATA.meta.gradeList.map((g) => {
+    const label = document.createElement("label");
+    label.className = "grade-box";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = String(g);
+    input.checked = true;
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", `Grade ${g}`);
+    label.append(input, document.createTextNode(String(g)));
+    boxes.appendChild(label);
+    input.addEventListener("change", () => {
+      if (input.checked) CHECKED.add(g); else CHECKED.delete(g);
+      updateGradeLocks();
+      PINNED_ID = null; // a grade change closes any pinned pop-up
+      refreshView();
+    });
+    return input;
+  });
+  function updateGradeLocks() {
+    for (const input of gradeInputs) {
+      const last = input.checked && CHECKED.size === 1;
+      input.disabled = last;
+      input.parentElement.title = last ? "At least one grade must be selected" : "";
+    }
+  }
+  updateGradeLocks();
+  document.getElementById("grade-picker").hidden = false;
   let t;
   window.addEventListener("resize", () => {
     clearTimeout(t);

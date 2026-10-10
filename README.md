@@ -31,6 +31,7 @@ pip install -r requirements.txt
 python3 scripts/build_data.py              # reads data/*.xlsb|xlsx, writes site/data/schools.json
 python3 -m unittest discover -s tests -v   # about 30 seconds
 node --test tests/test_search.mjs          # school search rules (Node 18+, no installs)
+node --test tests/test_grades.mjs          # grade checkbox rules
 ```
 
 The source workbooks in `data/` are read only, never modified. The build stops with an error if the
@@ -89,11 +90,26 @@ school is counted once, under the first reason in this order:
 
 Counts shown on the page are unique schools.
 
-**"Hide schools with fewer than 30 students tested"** (checked on page load) is a display filter
-only. It hides plotted schools whose `tested` count, the denominator of the plotted rate, is under
-30. That is 157 schools, 18 of them "≥90%" FRP. The page lists them as a separate exclusion reason
-while the box is checked. Hidden schools stay searchable and selectable. The data file is
-unchanged.
+**Grade checkboxes** (grades 3–8 and 10, all checked on page load). The data file holds
+`gradeResults`: one row per plotted school, grade and student group (`id`, `grade`, `group`,
+`tested`, `met`). Only the `all` group (All students) is filled in so far. `met` is Meets + Advanced,
+or `null` where MDE suppressed the grade (1–9 tested); `tested` is always published. The build
+checks that each school's grade rows add up to its all-grades row. For each plotted school:
+
+- Grade rows with 0 tested count as "not tested".
+- If the checked grades include every grade the school tests, including suppressed ones, the value
+  is MDE's all-grades row. That figure also counts students in grades too small to report
+  individually. With every grade checked, the chart is therefore exactly the all-grades chart.
+- Otherwise, the value is the sum of `met` ÷ the sum of `tested` over the checked grades the school
+  tests (never an average of percentages). If any of those grades is suppressed, the school is
+  excluded: "data suppressed for one or more selected grades".
+- If the school tests none of the checked grades, it is excluded: "no students tested in selected
+  grades".
+
+**"Hide schools with fewer than N students tested"** (checked on page load) is a display filter
+only. It applies to students tested in the checked grades. N is 20 when one grade is checked and 30
+otherwise. With all grades checked it hides 157 schools, 18 of them "≥90%" FRP. The page lists hidden
+schools as a separate exclusion reason. All non-plotted schools stay searchable and selectable.
 
 ## Limitations
 
